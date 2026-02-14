@@ -60,6 +60,48 @@ by
     rw [union_of_allocated_items_unchanged]
     exact h_fea.cover
 
+lemma utility_increasing_for_cycle_agents (u : Agent → Finset Item → ℕ)
+  (A : Allocation Agent Item)
+  (C : EnvyCycle u A)
+  (i : Agent)
+  (h_mem : i ∈ C.agents) :
+  u i (rotate_allocation u A C i) > u i (A i) := by
+  obtain ⟨idx, h_idx⟩ := List.mem_iff_get.1 h_mem
+  by_cases h_last : idx.val = C.agents.length - 1
+  · simp [rotate_allocation]
+    have h_envy_last: Envies u A (C.agents[idx.val]) (C.agents[0]) := by
+      simp [h_last]
+      exact C.last
+    have h_i_next_eq_head : EnvyCycle.next u C i = C.agents[0] := by
+      rw [← h_idx]
+      simp [h_last]
+      exact (EnvyCycle.next_of_last u C)
+    rw [h_i_next_eq_head]
+    simp [Envies] at h_envy_last
+    simp at h_idx
+    rw [h_idx] at h_envy_last
+    omega
+  · simp [rotate_allocation]
+    have h_envy_next : Envies u A (C.agents[idx.val]) (C.agents[idx.val + 1]) := by
+      exact C.chain idx (by omega)
+    have h_i_next_eq_next : EnvyCycle.next u C i = C.agents[idx.val + 1] := by
+      rw [← h_idx]
+      exact (EnvyCycle.next_of_other u C idx.val (by omega))
+    rw [h_i_next_eq_next]
+    simp [Envies] at h_envy_next
+    simp at h_idx
+    rw [h_idx] at h_envy_next
+    omega
+
+lemma utility_unchanged_for_non_cycle_agents (u : Agent → Finset Item → ℕ)
+  (A : Allocation Agent Item)
+  (C : EnvyCycle u A)
+  (i : Agent)
+  (h_not_mem : i ∉ C.agents) : u i (rotate_allocation u A C i) = u i (A i) := by
+  simp [rotate_allocation]
+  unfold EnvyCycle.next
+  simp [h_not_mem]
+
 lemma utility_nondecreasing_under_rotation (u : Agent → Finset Item → ℕ)
   (A : Allocation Agent Item)
   (C : EnvyCycle u A) :
@@ -69,36 +111,11 @@ lemma utility_nondecreasing_under_rotation (u : Agent → Finset Item → ℕ)
   -- This means we need to show that for each agent, the items allocated to them after rotation
   -- give them at least as much utility as the items allocated to them before rotation.
   by_cases h_mem : i ∈ C.agents
-  · obtain ⟨idx, h_idx⟩ := List.mem_iff_get.1 h_mem
-    by_cases h_last: idx.val = C.agents.length - 1
-    · simp [rotate_allocation]
-      have h_envy_last: Envies u A (C.agents[idx.val]) (C.agents[0]) := by
-        simp [h_last]
-        exact C.last
-      have h_i_next_eq_head : EnvyCycle.next u C i = C.agents[0] := by
-        rw [← h_idx]
-        simp [h_last]
-        exact (EnvyCycle.next_of_last u C)
-      rw [h_i_next_eq_head]
-      simp [Envies] at h_envy_last
-      simp at h_idx
-      rw [h_idx] at h_envy_last
-      omega
-    · simp [rotate_allocation]
-      have h_envy_next : Envies u A (C.agents[idx.val]) (C.agents[idx.val + 1]) := by
-        exact C.chain idx (by omega)
-      have h_i_next_eq_next : EnvyCycle.next u C i = C.agents[idx.val + 1] := by
-        rw [← h_idx]
-        exact (EnvyCycle.next_of_other u C idx.val (by omega))
-      rw [h_i_next_eq_next]
-      simp [Envies] at h_envy_next
-      simp at h_idx
-      rw [h_idx] at h_envy_next
-      omega
+  · have := utility_increasing_for_cycle_agents u A C i h_mem
+    linarith
   · -- If i is not in the envy cycle, then rotate_allocation u A C i = A i, so utility is unchanged
-    rw [rotate_allocation]
-    unfold EnvyCycle.next
-    simp [h_mem]
+    have := utility_unchanged_for_non_cycle_agents u A C i h_mem
+    rw [this]
 
 lemma ef1_preserved_under_rotation (u : Agent → Finset Item → ℕ)
   (A : Allocation Agent Item) (C : EnvyCycle u A) :
@@ -145,31 +162,28 @@ lemma ef1_preserved_under_rotation (u : Agent → Finset Item → ℕ)
 
 
 lemma potential_decreases_after_rotation (u : Agent → Finset Item → ℕ)
-  (h_mono_u: Monotone u)
-  (A : Allocation Agent Item) (C : EnvyCycle u A) :
-  potential u A > potential u (rotate_allocation u A C) := by
-  -- We need to show that the potential function decreases after rotation.
-  -- The potential function is defined as the sum of the utilities of all agents.
-  -- Since we have already shown that the utility of each agent does not decrease after rotation,
-  -- and at least one agent's utility strictly decreases (the one who envies), we can conclude
-  -- that the total potential decreases.
-
-  -- have h_envy : ∃ i j, Envies u A i j := by
-  --   use [C.agents[0], C.agents[1]]
-  --   exact C.chain 0 (by omega)
-  -- rcases h_envy with ⟨i, j, h_envy_ij⟩
-  -- have h_utility_i_decreases : u i (rotate_allocation u A C i) < u i (A i) := by
-  --   exact h_envy_ij
-  -- have h_utility_j_increases_or_same : u j (rotate_allocation u A C j) ≥ u j (A j) := by
-  --   apply utility_nondecreasing_under_rotation u A C j
-  -- have h_potential_decrease : Potential u A > Potential u (rotate_allocation u A C) := by
-  --   unfold Potential
-  --   simp only [Finset.sum_univ]
-  --   have h_sum_diff : ∑ a in Finset.univ, u a (A a) - ∑ a in Finset.univ, u a (rotate_allocation u A C a) > 0 := by
-  --     apply Finset.sum_lt_sum_of_exists_lt
-  --     use i
-  --     constructor
-  --     · simp [Finset.mem_univ]
-  --     · linarith
-  --   rw [← sub_pos] at h_sum_diff
-  --   exact h_sum_diff
+  (h_mono_u : Monotone u)
+  (A : Allocation Agent Item)
+  (U : Finset Item)
+  (M : Finset Item)
+  (C : EnvyCycle u A)
+  (h_feasible : Feasible A U M):
+  potential u (rotate_allocation u A C) M < potential u A M := by
+  have h_feasible_after_rotation : Feasible (rotate_allocation u A C) U M := by
+    apply feasibility_preserved_under_rotation u A M C U
+    exact h_feasible
+  rw [
+    potential_lt_equiv_social_welfare_gt u (rotate_allocation u A C) _ _ _ _
+      h_mono_u h_feasible_after_rotation h_feasible
+  ]
+  unfold social_welfare
+  apply Finset.sum_lt_sum
+  · intro i hi
+    have := utility_nondecreasing_under_rotation u A C i
+    omega
+  · use C.agents.head C.not_nil
+    have h_C_head_mem : C.agents.head C.not_nil ∈ C.agents := by simp
+    have := utility_increasing_for_cycle_agents u A C (C.agents.head C.not_nil) h_C_head_mem
+    constructor
+    · simp [Finset.mem_univ]
+    · linarith
