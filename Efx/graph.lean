@@ -43,8 +43,8 @@ lemma feasibility_preserved_under_rotation
   (Items : Finset Item)
   (C : EnvyCycle u A)
   (U : Finset Item) :
-  is_feasible A U Items →
-  is_feasible (rotate_allocation u A C) U Items :=
+  Feasible A U Items →
+  Feasible (rotate_allocation u A C) U Items :=
 by
   intro h_fea
   -- We need to show that the new allocation after rotation is still feasible.
@@ -142,3 +142,34 @@ lemma ef1_preserved_under_rotation (u : Agent → Finset Item → ℕ)
   · exact hg_in_j_next
   · simp [i_next] at h_envies_i_next_org
     omega
+
+
+lemma potential_decreases_after_rotation (u : Agent → Finset Item → ℕ)
+  (h_mono_u: Monotone u)
+  (A : Allocation Agent Item) (C : EnvyCycle u A) :
+  potential u A > potential u (rotate_allocation u A C) := by
+  -- We need to show that the potential function decreases after rotation.
+  -- The potential function is defined as the sum of the utilities of all agents.
+  -- Since we have already shown that the utility of each agent does not decrease after rotation,
+  -- and at least one agent's utility strictly decreases (the one who envies), we can conclude
+  -- that the total potential decreases.
+
+  -- have h_envy : ∃ i j, Envies u A i j := by
+  --   use [C.agents[0], C.agents[1]]
+  --   exact C.chain 0 (by omega)
+  -- rcases h_envy with ⟨i, j, h_envy_ij⟩
+  -- have h_utility_i_decreases : u i (rotate_allocation u A C i) < u i (A i) := by
+  --   exact h_envy_ij
+  -- have h_utility_j_increases_or_same : u j (rotate_allocation u A C j) ≥ u j (A j) := by
+  --   apply utility_nondecreasing_under_rotation u A C j
+  -- have h_potential_decrease : Potential u A > Potential u (rotate_allocation u A C) := by
+  --   unfold Potential
+  --   simp only [Finset.sum_univ]
+  --   have h_sum_diff : ∑ a in Finset.univ, u a (A a) - ∑ a in Finset.univ, u a (rotate_allocation u A C a) > 0 := by
+  --     apply Finset.sum_lt_sum_of_exists_lt
+  --     use i
+  --     constructor
+  --     · simp [Finset.mem_univ]
+  --     · linarith
+  --   rw [← sub_pos] at h_sum_diff
+  --   exact h_sum_diff
