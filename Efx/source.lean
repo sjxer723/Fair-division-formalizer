@@ -244,36 +244,71 @@ def add_item_to_agent
   U := st.U.erase g }
 
 
--- lemma feasibility_preserved_under_add_item_to_agent
---   (c : FDContext Agent Item)
---   (st : FDState Agent Item)
---   (source : Agent)
---   (g : Item)
---   (h_feasible : Feasible c st)
---   (h_g_in_U : g ∈ st.U) :
---   Feasible c (add_item_to_agent c st source g) := by
---   constructor
---   · -- Show that the new allocation's items are disjoint from U
+lemma feasibility_preserved_under_add_item_to_agent
+  (c : FDContext Agent Item)
+  (st : FDState Agent Item)
+  (source : Agent)
+  (g : Item)
+  (h_g_in_U : g ∈ st.U)
+  (h_feasible : Feasible c st) :
+  Feasible c (add_item_to_agent c st source g) := by
+  have h_disjoint : Disjoint (Finset.univ.biUnion st.A) st.U := h_feasible.disjoint
+  have h_disjoint_i : ∀ i, Disjoint (st.A i) st.U := by
+    intro i
+    apply Finset.disjoint_left.2
+    intro x hx_union hx_erase
+    have hx_union' : x ∈ Finset.univ.biUnion st.A :=
+      Finset.mem_biUnion.mpr ⟨i, Finset.mem_univ i, hx_union⟩
+    have hx_inter : x ∈ Finset.univ.biUnion st.A ∩ st.U := by
+      exact Finset.mem_inter.mpr ⟨hx_union', hx_erase⟩
+    have := h_disjoint.le_bot hx_inter
+    simp at this
+  have h_intersect_false : ∀ i x, x ∈ st.A i → x ∈ st.U → False := by
+    intro i x hx_A hx_U
+    have h_inter : x ∈ st.A i ∩ st.U := by
+      exact Finset.mem_inter.mpr ⟨hx_A, hx_U⟩
+    have := h_disjoint_i i
+    -- simp at this
+    have h_bot : st.A i ∩ st.U = ∅ := this.eq_bot
+    simp [h_bot] at h_inter
 
+  constructor
+  · -- Show that the new allocation's items are disjoint from U
+    simp [add_item_to_agent]
+    apply Finset.disjoint_left.2
+    intro x hx_union hx_erase
 
---   -- simp Feasible
+    have h_x_in_U : x ∈ st.U := by
+      rcases Finset.mem_erase.mp hx_erase with ⟨hne, hxU⟩
+      exact hxU
 
---   intro i
---   by_cases h_source : i = source
---   · rw [h_source]
---     simp [add_item_to_agent]
---     apply h_feasible
---     simp [h_source]
---     exact h_g_in_U
---   · simp [add_item_to_agent]
---     apply h_feasible
---     simp [h_source]
+    rcases Finset.mem_biUnion.1 hx_union with ⟨i, ⟨h_i, h_mem_i⟩⟩
+    by_cases hcase : i = source
+    · simp [hcase] at h_mem_i
+      rcases h_mem_i with hx_eq | hx_A
+      · rw [hx_eq] at hx_erase
+        exact (Finset.notMem_erase g st.U) hx_erase
+      · exact h_intersect_false source x hx_A h_x_in_U
+    · simp [hcase] at h_mem_i
+      exact h_intersect_false i x h_mem_i h_x_in_U
+  · -- Show that the union of the new allocation's items and U is equal to Items
+    simp [add_item_to_agent]
+    have h_cover : Finset.univ.biUnion st.A ∪ st.U = c.M := h_feasible.cover
+    have h_allocation_change : Finset.univ.biUnion (add_item_to_agent c st source g).A =
+      Finset.univ.biUnion st.A ∪ {g} := by
+      simp [add_item_to_agent]
+      rw [biUnion_update_add_g st.A source g]
+      simp
+    simp [add_item_to_agent] at h_allocation_change
+    rw [h_allocation_change, ← h_cover]
+    exact insert_union_erase_of_mem h_g_in_U
+
 
 lemma utility_nondecreasing_after_add_item_to_agent
   (c : FDContext Agent Item)
   (st : FDState Agent Item)
   (source i : Agent)
-  (g : Item):
+  (g : Item) :
   let st1 := add_item_to_agent c st source g;
   c.u i (st.A i) ≤ c.u i (st1.A i) := by
   intro st1
@@ -287,37 +322,38 @@ lemma utility_nondecreasing_after_add_item_to_agent
     simp [add_item_to_agent]
     simp [h_source]
 
--- lemma potential_decreases_after_add_item_to_agent
---   (c : FDContext Agent Item)
---   (st : FDState Agent Item)
---   (h_feasible : Feasible c st)
---   (source : Agent)
---   (g : Item)
---   (h_g_in_U : g ∈ st.U):
---   let st1 := add_item_to_agent c st source g;
---   potential c st1 < potential c st := by
---   intro st1
---   unfold st1
+lemma potential_decreases_after_add_item_to_agent
+  (c : FDContext Agent Item)
+  (st : FDState Agent Item)
+  (h_feasible : Feasible c st)
+  (source : Agent)
+  (g : Item)
+  (h_g_in_U : g ∈ st.U) :
+  let st1 := add_item_to_agent c st source g;
+  potential c st1 < potential c st := by
+  intro st1
+  unfold st1
 
---   have h_unalocated_decreases : st1.U.card < st.U.card := by
---     unfold st1
---     simp [add_item_to_agent]
---     have :(st.U.erase g).card < st.U.card :=
---       Finset.card_erase_lt_of_mem h_g_in_U
---     simp
+  have h_unalocated_decreases : st1.U.card < st.U.card := by
+    unfold st1
+    simp [add_item_to_agent]
+    have :(st.U.erase g).card < st.U.card :=
+      Finset.card_erase_lt_of_mem h_g_in_U
+    simp
+    exact this
 
---   have h_social_welfare_nondecreasing : social_welfare c (add_item_to_agent c st source g) ≥ social_welfare c st := by
---     unfold social_welfare
---     apply Finset.sum_le_sum
---     intro i hi
---     apply utility_nondecreasing_after_add_item_to_agent c st source i g
+  have h_social_welfare_nondecreasing :
+    social_welfare c (add_item_to_agent c st source g) ≥ social_welfare c st :=
+    by
+    unfold social_welfare
+    apply Finset.sum_le_sum
+    intro i hi
+    apply utility_nondecreasing_after_add_item_to_agent c st source i g
 
---   apply (potential_lt_implied_by_unallocated_size_lt c _ st)
+  have h_feasible1 : Feasible c st1 := by
+    apply feasibility_preserved_under_add_item_to_agent c st source g h_g_in_U h_feasible
 
-  --  h_unalocated_decreases)
-
-  -- unfold
-
-
-  -- have h_feasible_after_add : Feasible c st1 := by
-  --   apply feasibility_preserved_under_add_item_to_agent c st source g h_feasible
+  exact (
+    potential_lt_implied_by_unallocated_size_lt c st1 st h_feasible1 h_feasible
+      h_social_welfare_nondecreasing h_unalocated_decreases
+  )
