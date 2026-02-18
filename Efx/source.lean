@@ -93,10 +93,10 @@ classical
 
 omit [DecidableEq Item] in
 lemma exists_source_of_no_cycle
-  (u : Agent → Finset Item → ℕ)
-  (A : Allocation Agent Item)
-  (h_no_cycle : ∀ C : EnvyCycle u A, False) :
-  ∃ i : Agent, ∀ j : Agent, ¬ Envies u A j i := by
+  (c : FDContext Agent Item)
+  (st : FDState Agent Item)
+  (h_no_cycle : ∀ C : EnvyCycle c st, False) :
+  ∃ i : Agent, ∀ j : Agent, ¬ Envies c.u st.A j i := by
 /-
     Step 1: If there is no source, then every agent is envied by someone.
     We will show this leads to an infinite chain, which implies a cycle in a finite set.
@@ -145,7 +145,7 @@ lemma exists_source_of_no_cycle
     f^{k-1-i} x envies f^{k-2-i} x.
   -/
   have h_chain : ∀ i (hi : i < cycle_agents.length - 1),
-    Envies u A (cycle_agents.get ⟨i, by omega⟩) (cycle_agents.get ⟨i + 1, by omega⟩) := by
+    Envies c.u st.A (cycle_agents.get ⟨i, by omega⟩) (cycle_agents.get ⟨i + 1, by omega⟩) := by
     intro i hi
     simp [cycle_agents]
     unfold x_seq
@@ -165,7 +165,7 @@ lemma exists_source_of_no_cycle
   have h_til : cycle_agents.getLast h_ne = x_seq 0 := by
     simp [cycle_agents, List.getLast_reverse]
 
-  have h_last : Envies u A (cycle_agents[cycle_agents.length - 1]) (cycle_agents[0]) := by
+  have h_last : Envies c.u st.A (cycle_agents[cycle_agents.length - 1]) (cycle_agents[0]) := by
     have h_fixed_point : x_seq k = x_seq 0 := by
       simp [x_seq]
       exact h_fkx_eq_x
@@ -178,7 +178,7 @@ lemma exists_source_of_no_cycle
     simp
     apply (hf (f^[k - 1] x))
 
-  have h_gt_one: cycle_agents.length > 1 := by
+  have h_length_gt_one: cycle_agents.length > 1 := by
     rw [h_len]
     by_contra h_le_one
     have h_eq : k = 1 := by omega
@@ -230,5 +230,94 @@ lemma exists_source_of_no_cycle
       omega
 
   -- Step 6: Construct the EnvyCycle structure and derive a contradiction
-  have cycle : EnvyCycle u A := ⟨cycle_agents, h_nodup, h_ne, h_gt_one, h_chain, h_last⟩
+  have cycle : EnvyCycle c st := ⟨cycle_agents, h_nodup, h_ne, h_length_gt_one, h_chain, h_last⟩
+
   exact h_no_cycle cycle
+
+
+def add_item_to_agent
+  (c : FDContext Agent Item)
+  (st : FDState Agent Item)
+  (source : Agent)
+  (g : Item) : FDState Agent Item :=
+{ A := fun i => if i = source then st.A i ∪ {g} else st.A i,
+  U := st.U.erase g }
+
+
+-- lemma feasibility_preserved_under_add_item_to_agent
+--   (c : FDContext Agent Item)
+--   (st : FDState Agent Item)
+--   (source : Agent)
+--   (g : Item)
+--   (h_feasible : Feasible c st)
+--   (h_g_in_U : g ∈ st.U) :
+--   Feasible c (add_item_to_agent c st source g) := by
+--   constructor
+--   · -- Show that the new allocation's items are disjoint from U
+
+
+--   -- simp Feasible
+
+--   intro i
+--   by_cases h_source : i = source
+--   · rw [h_source]
+--     simp [add_item_to_agent]
+--     apply h_feasible
+--     simp [h_source]
+--     exact h_g_in_U
+--   · simp [add_item_to_agent]
+--     apply h_feasible
+--     simp [h_source]
+
+lemma utility_nondecreasing_after_add_item_to_agent
+  (c : FDContext Agent Item)
+  (st : FDState Agent Item)
+  (source i : Agent)
+  (g : Item):
+  let st1 := add_item_to_agent c st source g;
+  c.u i (st.A i) ≤ c.u i (st1.A i) := by
+  intro st1
+  unfold st1
+  by_cases h_source : i = source
+  · rw [h_source]
+    simp [add_item_to_agent]
+    apply c.mono_u
+    simp
+  · apply c.mono_u
+    simp [add_item_to_agent]
+    simp [h_source]
+
+-- lemma potential_decreases_after_add_item_to_agent
+--   (c : FDContext Agent Item)
+--   (st : FDState Agent Item)
+--   (h_feasible : Feasible c st)
+--   (source : Agent)
+--   (g : Item)
+--   (h_g_in_U : g ∈ st.U):
+--   let st1 := add_item_to_agent c st source g;
+--   potential c st1 < potential c st := by
+--   intro st1
+--   unfold st1
+
+--   have h_unalocated_decreases : st1.U.card < st.U.card := by
+--     unfold st1
+--     simp [add_item_to_agent]
+--     have :(st.U.erase g).card < st.U.card :=
+--       Finset.card_erase_lt_of_mem h_g_in_U
+--     simp
+
+--   have h_social_welfare_nondecreasing : social_welfare c (add_item_to_agent c st source g) ≥ social_welfare c st := by
+--     unfold social_welfare
+--     apply Finset.sum_le_sum
+--     intro i hi
+--     apply utility_nondecreasing_after_add_item_to_agent c st source i g
+
+--   apply (potential_lt_implied_by_unallocated_size_lt c _ st)
+
+  --  h_unalocated_decreases)
+
+  -- unfold
+
+
+  -- have h_feasible_after_add : Feasible c st1 := by
+  --   apply feasibility_preserved_under_add_item_to_agent c st source g h_feasible
