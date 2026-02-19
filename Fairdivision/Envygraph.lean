@@ -4,7 +4,134 @@ import Fairdivision.FinUtils
 open fairdivision
 
 variable {Agent Item : Type}
-variable [Fintype Agent] [Inhabited Agent] [DecidableEq Agent] [DecidableEq Item]
+variable [Fintype Agent] [Inhabited Agent] [DecidableEq Agent]
+
+structure EnvyCycle (c : FDContext Agent Item) (st : FDState Agent Item) where
+  agents : List Agent
+  nodup  : agents.Nodup
+  not_nil : agents ≠ []
+  length_gt_one : agents.length > 1
+  chain  : ∀ i (hi : i < agents.length - 1),
+    Envies c.u st.A (agents.get ⟨i, by omega⟩) (agents.get ⟨i + 1, by omega⟩)
+  last   : Envies c.u st.A (agents[agents.length - 1]) (agents[0])
+
+def EnvyCycle.next
+  (c : FDContext Agent Item)
+  (st : FDState Agent Item)
+  (C : EnvyCycle c st)
+  (i : Agent)
+  : Agent :=
+  match C.agents.findIdx (· = i) with
+  | idx =>
+      if h : idx < C.agents.length then
+        -- Get the next agent in the list (circularly)
+        C.agents.get (⟨idx, h⟩ + ⟨1, C.length_gt_one⟩)
+      else i
+
+def EnvyCycle.prev
+  (c : FDContext Agent Item)
+  (st : FDState Agent Item)
+  (C : EnvyCycle c st)
+  (i : Agent)
+  : Agent :=
+  match C.agents.findIdx (· = i) with
+  | idx =>
+      if h : idx < C.agents.length then
+        -- Get the previous agent in the list (circularly)
+        C.agents.get (⟨idx, h⟩ + ⟨C.agents.length - 1, by omega⟩)
+      else i
+
+lemma EnvyCycle.next_prev
+  (c : FDContext Agent Item)
+  (st : FDState Agent Item)
+  (C : EnvyCycle c st)
+  (i : Agent) :
+  i = C.prev c st (C.next c st i)  := by
+  by_cases hmem : i ∈ C.agents
+  · --- i ∈ C.agents
+    rcases List.mem_iff_get.mp hmem with ⟨idx, hidx, hget⟩
+    unfold next prev
+    simp
+    have h_inner : List.findIdx (· = C.agents[idx]) C.agents = idx := by
+      apply findIdx_get _ C.nodup idx
+    simp [h_inner] at *
+    congr
+    let next_idx : Fin C.agents.length := idx + ⟨1, C.length_gt_one⟩
+    have h_find :
+      List.findIdx (· = C.agents[next_idx.val]) C.agents = next_idx := by
+        simp [findIdx_get _ C.nodup next_idx]
+    unfold next_idx at h_find
+    simp_all
+  · -- i ∉ C.agents
+    unfold next prev
+    simp [hmem]
+
+-- set_option pp.all true in
+lemma EnvyCycle.prev_next
+  (c : FDContext Agent Item)
+  (st : FDState Agent Item)
+  (C : EnvyCycle c st)
+  (i : Agent) :
+  i = C.next c st (C.prev c st i) := by
+  by_cases hmem : i ∈ C.agents
+  · --- i ∈ C.agents
+    rcases List.mem_iff_get.mp hmem with ⟨idx, hidx, hget⟩
+    unfold next prev
+    simp
+    have h_inner : List.findIdx (· = C.agents[idx]) C.agents = idx := by
+      apply findIdx_get _ C.nodup idx
+    simp [h_inner] at *
+    congr
+    let prev_idx : Fin C.agents.length := idx + ⟨C.agents.length - 1, by omega⟩
+    have h_find :
+      List.findIdx (· = C.agents[prev_idx.val]) C.agents = prev_idx := by
+        simp [findIdx_get _ C.nodup prev_idx]
+    unfold prev_idx at h_find
+    simp_all
+  · -- i ∉ C.agents
+    unfold next prev
+    simp [hmem]
+
+
+lemma EnvyCycle.next_of_last
+  (c : FDContext Agent Item)
+  (st : FDState Agent Item)
+  (C : EnvyCycle c st) :
+  have : C.agents.length > 1 := C.length_gt_one;
+  C.next c st (C.agents[C.agents.length - 1]) = C.agents[0] := by
+  unfold EnvyCycle.next
+  have h_C_pos_len : C.agents.length > 1 := C.length_gt_one
+  let idx_of_last := List.findIdx (fun x ↦ decide (x = C.agents[C.agents.length - 1])) C.agents
+  have idx_of_last_eq_len_minus_one : idx_of_last = C.agents.length - 1 := by
+    unfold idx_of_last
+    exact (findIdx_get _ C.nodup ⟨C.agents.length - 1, by omega⟩)
+  have idx_of_last_lt_len : idx_of_last < C.agents.length := by
+    rw [idx_of_last_eq_len_minus_one]
+    omega
+  have h_next_of_last : C.agents.get
+           (⟨idx_of_last, idx_of_last_lt_len⟩ + ⟨1, h_C_pos_len⟩)
+         = C.agents.get ⟨0, by omega⟩ := by
+    simp [idx_of_last_eq_len_minus_one]
+  simp
+  exact h_next_of_last
+
+lemma EnvyCycle.next_of_other
+  (c : FDContext Agent Item)
+  (st : FDState Agent Item)
+  (C : EnvyCycle c st)
+  (i : ℕ)
+  (hmem : i < C.agents.length - 1) :
+  C.next c st (C.agents[i]) = C.agents[i + 1] := by
+  unfold EnvyCycle.next
+  let idx : Fin C.agents.length := ⟨i, by omega⟩
+  have h_find_idx : List.findIdx (fun x ↦ decide (x = C.agents[i])) C.agents = i := by
+    apply findIdx_get _ C.nodup idx
+  have h_i_lt_len : i < C.agents.length := by
+    omega
+  simp [h_find_idx]
+  simp [h_i_lt_len]
+  congr
+  simp_all
 
 lemma exists_cycle_of_finite {V : Type} [Fintype V] [Inhabited V] [DecidableEq V] (f : V → V) :
   ∃ v k, k > 0 ∧ (f^[k]) v = v :=
@@ -81,7 +208,6 @@ classical
     exact (hmin m hm.left h_contra).elim
 
 
-omit [DecidableEq Item] in
 lemma exists_source_of_no_cycle
   (c : FDContext Agent Item)
   (st : FDState Agent Item)
@@ -223,113 +349,3 @@ lemma exists_source_of_no_cycle
   have cycle : EnvyCycle c st := ⟨cycle_agents, h_nodup, h_ne, h_length_gt_one, h_chain, h_last⟩
 
   exact h_no_cycle cycle
-
-
-def add_item_to_agent
-  (st : FDState Agent Item)
-  (source : Agent)
-  (g : Item) : FDState Agent Item :=
-{ A := fun i => if i = source then st.A i ∪ {g} else st.A i,
-  U := st.U.erase g }
-
-
-lemma feasibility_preserved_under_add_item_to_agent
-  (c : FDContext Agent Item)
-  (st : FDState Agent Item)
-  (source : Agent)
-  (g : Item)
-  (h_g_in_U : g ∈ st.U)
-  (h_feasible : Feasible c st) :
-  Feasible c (add_item_to_agent st source g) := by
-  have h_disjoint : Disjoint (Finset.univ.biUnion st.A) st.U := h_feasible.disjoint
-  have h_cover : Finset.univ.biUnion st.A ∪ st.U = c.M := h_feasible.cover
-  constructor
-  · -- Show that the new allocation's items are disjoint from U
-    simp [add_item_to_agent]
-    simp_all
-  · -- Show that the union of the new allocation's items and U is equal to Items
-    simp [add_item_to_agent]
-    simp_all
-
-lemma utility_nondecreasing_after_add_item_to_agent
-  (c : FDContext Agent Item)
-  (st : FDState Agent Item)
-  (source i : Agent)
-  (g : Item) :
-  c.u i (st.A i) ≤ c.u i ((add_item_to_agent st source g).A i) := by
-  by_cases h_source : i = source
-  -- source agent gets a new item, so utility should increase
-  · rw [h_source]
-    simp [add_item_to_agent]
-    apply c.mono_u
-    simp
-  -- other agents' bundles are unchanged, so utility should be the same
-  · apply c.mono_u
-    simp [add_item_to_agent, h_source]
-
-lemma potential_decreases_after_add_item_to_agent
-  (c : FDContext Agent Item)
-  (st : FDState Agent Item)
-  (h_feasible : Feasible c st)
-  (source : Agent)
-  (g : Item)
-  (h_g_in_U : g ∈ st.U) :
-  potential c (add_item_to_agent st source g) < potential c st := by
-
-  -- the number of unallocated items decreases by 1
-  have h_unallocated_decreases : (add_item_to_agent st source g).U.card < st.U.card := by
-    simp [add_item_to_agent]
-    exact (Finset.card_erase_lt_of_mem h_g_in_U)
-
-  -- the total social welfare does not decrease
-  have h_social_welfare_nondecreasing :
-    social_welfare c (add_item_to_agent st source g) ≥ social_welfare c st := by
-    unfold social_welfare
-    apply Finset.sum_le_sum
-    intro i hi
-    exact utility_nondecreasing_after_add_item_to_agent c st source i g
-
-  -- the allocation remains feasible
-  have h_feasible1 : Feasible c (add_item_to_agent st source g) := by
-    exact feasibility_preserved_under_add_item_to_agent c st source g h_g_in_U h_feasible
-
-  simp_all
-
-lemma ef1_preserved_under_add_item_to_agent
-  (c : FDContext Agent Item)
-  (st : FDState Agent Item)
-  (source : Agent)
-  (h_source : ∀ j, ¬ Envies c.u st.A j source)
-  (g : Item) :
-  let st1 := add_item_to_agent st source g;
-  EF1 c.u st.A → EF1 c.u st1.A := by
-  intro st1 h_ef1
-  unfold st1 EF1
-  intro i j
-  have h_envy_st1 : EF1ij c.u st.A i j := h_ef1 i j
-  -- simp [EF1ij] at h_envy_st1
-  by_cases h_source_i : i = source
-  · simp [h_source_i] at *
-    by_cases h_source_j : j = source
-    · simp [h_source_j]
-      simp [EF1ij]
-      intro h_envy
-      simp [Envies] at h_envy
-    · simp [add_item_to_agent]
-      have h_j_not_envy_source : ¬ Envies c.u st.A j source := h_source j
-      exact (ef1ij_insert_i_of_ef1ij h_envy_st1)
-  · have h_i_neq_source : i ≠ source := by omega
-    by_cases h_source_j : j = source
-    · simp [h_source_j] at *
-      simp [add_item_to_agent]
-      exact (ef1ij_maintained_after_adding_item_to_j c i source st.A g (h_source i))
-    · have h_j_neq_source : j ≠ source := by omega
-      simp [EF1ij]
-      have h_i_bundle_unchanged : (add_item_to_agent st source g).A i = st.A i := by
-        simp [add_item_to_agent, h_i_neq_source]
-      have h_j_bundle_unchanged : (add_item_to_agent st source g).A j = st.A j := by
-        simp [add_item_to_agent, h_j_neq_source]
-      -- rw [h_i_bundle_unchanged, h_j_bundle_unchanged] at h_envy_
-      simp [Envies]
-      rw [h_i_bundle_unchanged, h_j_bundle_unchanged] at *
-      exact h_envy_st1
