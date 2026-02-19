@@ -1,4 +1,4 @@
-import Efx.Basic
+import Fairdivision.Basic
 
 open fairdivision
 

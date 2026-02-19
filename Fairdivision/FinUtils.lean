@@ -7,6 +7,8 @@ import Mathlib.Algebra.BigOperators.Group.Finset.Basic
 
 
 variable {α : Type _} [DecidableEq α]
+
+@[simp]
 lemma findIdx_get (l : List α) (hnodup : l.Nodup) (i : Fin l.length) :
     l.findIdx (fun x => x = l[i.val]) = i := by
   rw [List.findIdx_eq i.isLt]
@@ -25,9 +27,10 @@ lemma findIdx_get (l : List α) (hnodup : l.Nodup) (i : Fin l.length) :
     --  l[j] ≠ l[i]
     exact h_ne h_eq
 
+@[simp]
 lemma fin_add_one_sub_one
   {n : Nat} (idx : Fin n) (h : 1 < n) :
-  idx = idx + ⟨1, h⟩ + ⟨n - 1, (by omega)⟩ := by
+  idx + ⟨1, h⟩ + ⟨n - 1, (by omega)⟩ = idx := by
   -- reduce equality of `Fin` to equality of the `.val` (nat) components
   ext
   simp only [Fin.val_add]
@@ -38,9 +41,9 @@ lemma fin_add_one_sub_one
   rw [Nat.add_mod_right]
   rw [Nat.mod_eq_of_lt idx.is_lt]
 
-lemma fin_sub_one_add_one
-  {n : Nat} (idx : Fin n) (h : 1 < n) :
-  idx = idx + ⟨n - 1, (by omega)⟩ + ⟨1, h⟩ := by
+@[simp]
+lemma fin_sub_one_add_one {n : Nat} (i : Fin n) (h : 1 < n) :
+  i + ⟨n - 1, (by omega)⟩ + ⟨1, h⟩  = i := by
   -- reduce equality of `Fin` to equality of the `.val` (nat) components
   ext
   simp only [Fin.val_add]
@@ -49,40 +52,34 @@ lemma fin_sub_one_add_one
   have h_fold: (n - 1 + 1) = n := by omega
   rw [h_fold]
   rw [Nat.add_mod_right]
-  rw [Nat.mod_eq_of_lt idx.is_lt]
+  rw [Nat.mod_eq_of_lt i.is_lt]
 
-
-lemma fin_i_lt_n_add_one
-  {n : Nat} (h : 1 < n) (hi : i < n - 1) :
+@[simp]
+lemma fin_i_lt_n_add_one {n i : Nat} (h : 1 < n) (hi : i < n - 1) :
   (⟨i, by omega⟩ : Fin n) + ⟨1, h⟩ = (⟨i + 1, by omega⟩ : Fin n) := by
   ext
   simp only [Fin.val_add]
   have h_fold: (i + 1) = i + 1 := by omega
+  have hi' : i + 1 < n := by omega
   rw [h_fold]
-  have hi' : i + 1 < n := by
-    omega
   rw [Nat.mod_eq_of_lt hi']
 
 
-lemma fin_n_minus_one_add_one
-  {n : Nat} (h : 1 < n) :
+@[simp]
+lemma fin_n_minus_one_add_one {n : Nat} (h : 1 < n) :
   (⟨n - 1, by omega⟩ : Fin n) + ⟨1, h⟩ = (⟨0, by omega⟩ : Fin n) := by
   ext
   simp only [Fin.val_add]
   have h_fold: (n - 1 + 1) = n := by omega
+  have hn0 : n ≠ 0 := by omega
   rw [h_fold]
-  have hn0 : n ≠ 0 := by
-    omega
   simp [Nat.mod_self]
 
-
-lemma insert_union_erase_of_mem
-  {α} [DecidableEq α]
-  {g : α} {t s : Finset α} (h : g ∈ s) :
+@[simp]
+lemma insert_union_erase_eq_union_of_mem {α} [DecidableEq α] {g : α} {t s : Finset α} (h : g ∈ s) :
   insert g t ∪ s.erase g = t ∪ s :=
 by
-  have h₁ := Finset.insert_erase h
-
+  have h1 := Finset.insert_erase h
   calc
     insert g t ∪ s.erase g
         = insert g (t ∪ s.erase g) := by
@@ -90,10 +87,34 @@ by
     _   = t ∪ insert g (s.erase g) := by
             simp [Finset.union_insert]
     _   = t ∪ s := by
-            simp [h₁]
+            simp [h1]
 
--- protected def biUnion (s : Finset α) (t : α → Finset β) : Finset β :=
---   (s.1.bind fun a ↦ (t a).1).Set.toFinset
+@[simp]
+lemma insert_union_erase_eq_union_of_mem' {α} [DecidableEq α] {g : α} {t s : Finset α} (h : g ∈ s) :
+  insert g (t ∪ s.erase g) = t ∪ s :=
+by
+  rw [← insert_union_erase_eq_union_of_mem h]
+  simp
+
+@[simp]
+lemma disjoint_erase_of_disjoint {α} [DecidableEq α] {g : α} {t s : Finset α}
+  (h : Disjoint t s) : Disjoint t (s.erase g) :=
+by
+  apply Finset.disjoint_left.2
+  intro x hx_union hx_erase
+
+  have h_x_in_U : x ∈ s := by
+    rcases Finset.mem_erase.mp hx_erase with ⟨hne, hxU⟩
+    exact hxU
+
+  rw [disjoint_iff] at h
+  simp at h
+  have h_x_in_intersection : x ∈ t ∩ s := by
+    exact Finset.mem_inter.mpr ⟨hx_union, h_x_in_U⟩
+  rw [h] at h_x_in_intersection
+  simp_all
+
+
 variable [DecidableEq β] {s : Finset α} {t : Finset β}
 
 @[simp]

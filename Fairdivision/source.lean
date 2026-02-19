@@ -1,5 +1,5 @@
-import Efx.Basic
-import Efx.FinUtils
+import Fairdivision.Basic
+import Fairdivision.FinUtils
 
 open fairdivision
 
@@ -226,7 +226,6 @@ lemma exists_source_of_no_cycle
 
 
 def add_item_to_agent
-  (c : FDContext Agent Item)
   (st : FDState Agent Item)
   (source : Agent)
   (g : Item) : FDState Agent Item :=
@@ -241,76 +240,32 @@ lemma feasibility_preserved_under_add_item_to_agent
   (g : Item)
   (h_g_in_U : g ∈ st.U)
   (h_feasible : Feasible c st) :
-  Feasible c (add_item_to_agent c st source g) := by
+  Feasible c (add_item_to_agent st source g) := by
   have h_disjoint : Disjoint (Finset.univ.biUnion st.A) st.U := h_feasible.disjoint
-  have h_disjoint_i : ∀ i, Disjoint (st.A i) st.U := by
-    intro i
-    apply Finset.disjoint_left.2
-    intro x hx_union hx_erase
-    have hx_union' : x ∈ Finset.univ.biUnion st.A :=
-      Finset.mem_biUnion.mpr ⟨i, Finset.mem_univ i, hx_union⟩
-    have hx_inter : x ∈ Finset.univ.biUnion st.A ∩ st.U := by
-      exact Finset.mem_inter.mpr ⟨hx_union', hx_erase⟩
-    have := h_disjoint.le_bot hx_inter
-    simp at this
-  have h_intersect_false : ∀ i x, x ∈ st.A i → x ∈ st.U → False := by
-    intro i x hx_A hx_U
-    have h_inter : x ∈ st.A i ∩ st.U := by
-      exact Finset.mem_inter.mpr ⟨hx_A, hx_U⟩
-    have := h_disjoint_i i
-    -- simp at this
-    have h_bot : st.A i ∩ st.U = ∅ := this.eq_bot
-    simp [h_bot] at h_inter
-
+  have h_cover : Finset.univ.biUnion st.A ∪ st.U = c.M := h_feasible.cover
   constructor
   · -- Show that the new allocation's items are disjoint from U
     simp [add_item_to_agent]
-    apply Finset.disjoint_left.2
-    intro x hx_union hx_erase
-
-    have h_x_in_U : x ∈ st.U := by
-      rcases Finset.mem_erase.mp hx_erase with ⟨hne, hxU⟩
-      exact hxU
-
-    rcases Finset.mem_biUnion.1 hx_union with ⟨i, ⟨h_i, h_mem_i⟩⟩
-    by_cases hcase : i = source
-    · simp [hcase] at h_mem_i
-      rcases h_mem_i with hx_eq | hx_A
-      · rw [hx_eq] at hx_erase
-        exact (Finset.notMem_erase g st.U) hx_erase
-      · exact h_intersect_false source x hx_A h_x_in_U
-    · simp [hcase] at h_mem_i
-      exact h_intersect_false i x h_mem_i h_x_in_U
+    simp_all
   · -- Show that the union of the new allocation's items and U is equal to Items
     simp [add_item_to_agent]
-    have h_cover : Finset.univ.biUnion st.A ∪ st.U = c.M := h_feasible.cover
-    have h_allocation_change : Finset.univ.biUnion (add_item_to_agent c st source g).A =
-      Finset.univ.biUnion st.A ∪ {g} := by
-      simp [add_item_to_agent]
-      rw [univ_biUnion_inner_insert st.A source g]
-      simp
-    simp [add_item_to_agent] at h_allocation_change
-    rw [h_allocation_change, ← h_cover]
-    exact insert_union_erase_of_mem h_g_in_U
-
+    simp_all
 
 lemma utility_nondecreasing_after_add_item_to_agent
   (c : FDContext Agent Item)
   (st : FDState Agent Item)
   (source i : Agent)
   (g : Item) :
-  let st1 := add_item_to_agent c st source g;
-  c.u i (st.A i) ≤ c.u i (st1.A i) := by
-  intro st1
-  unfold st1
+  c.u i (st.A i) ≤ c.u i ((add_item_to_agent st source g).A i) := by
   by_cases h_source : i = source
+  -- source agent gets a new item, so utility should increase
   · rw [h_source]
     simp [add_item_to_agent]
     apply c.mono_u
     simp
+  -- other agents' bundles are unchanged, so utility should be the same
   · apply c.mono_u
-    simp [add_item_to_agent]
-    simp [h_source]
+    simp [add_item_to_agent, h_source]
 
 lemma potential_decreases_after_add_item_to_agent
   (c : FDContext Agent Item)
@@ -319,34 +274,26 @@ lemma potential_decreases_after_add_item_to_agent
   (source : Agent)
   (g : Item)
   (h_g_in_U : g ∈ st.U) :
-  let st1 := add_item_to_agent c st source g;
-  potential c st1 < potential c st := by
-  intro st1
-  unfold st1
+  potential c (add_item_to_agent st source g) < potential c st := by
 
-  have h_unalocated_decreases : st1.U.card < st.U.card := by
-    unfold st1
+  -- the number of unallocated items decreases by 1
+  have h_unallocated_decreases : (add_item_to_agent st source g).U.card < st.U.card := by
     simp [add_item_to_agent]
-    have :(st.U.erase g).card < st.U.card :=
-      Finset.card_erase_lt_of_mem h_g_in_U
-    simp
-    exact this
+    exact (Finset.card_erase_lt_of_mem h_g_in_U)
 
+  -- the total social welfare does not decrease
   have h_social_welfare_nondecreasing :
-    social_welfare c (add_item_to_agent c st source g) ≥ social_welfare c st :=
-    by
+    social_welfare c (add_item_to_agent st source g) ≥ social_welfare c st := by
     unfold social_welfare
     apply Finset.sum_le_sum
     intro i hi
-    apply utility_nondecreasing_after_add_item_to_agent c st source i g
+    exact utility_nondecreasing_after_add_item_to_agent c st source i g
 
-  have h_feasible1 : Feasible c st1 := by
-    apply feasibility_preserved_under_add_item_to_agent c st source g h_g_in_U h_feasible
+  -- the allocation remains feasible
+  have h_feasible1 : Feasible c (add_item_to_agent st source g) := by
+    exact feasibility_preserved_under_add_item_to_agent c st source g h_g_in_U h_feasible
 
-  exact (
-    potential_lt_implied_by_unallocated_size_lt c st1 st h_feasible1 h_feasible
-      h_social_welfare_nondecreasing h_unalocated_decreases
-  )
+  simp_all
 
 lemma ef1_preserved_under_add_item_to_agent
   (c : FDContext Agent Item)
@@ -354,7 +301,7 @@ lemma ef1_preserved_under_add_item_to_agent
   (source : Agent)
   (h_source : ∀ j, ¬ Envies c.u st.A j source)
   (g : Item) :
-  let st1 := add_item_to_agent c st source g;
+  let st1 := add_item_to_agent st source g;
   EF1 c.u st.A → EF1 c.u st1.A := by
   intro st1 h_ef1
   unfold st1 EF1
@@ -370,7 +317,7 @@ lemma ef1_preserved_under_add_item_to_agent
       simp [Envies] at h_envy
     · simp [add_item_to_agent]
       have h_j_not_envy_source : ¬ Envies c.u st.A j source := h_source j
-      exact (ef1ij_maintained_after_adding_item_to_i c source j st.A g h_envy_st1)
+      exact (ef1ij_insert_i_of_ef1ij h_envy_st1)
   · have h_i_neq_source : i ≠ source := by omega
     by_cases h_source_j : j = source
     · simp [h_source_j] at *
@@ -378,9 +325,9 @@ lemma ef1_preserved_under_add_item_to_agent
       exact (ef1ij_maintained_after_adding_item_to_j c i source st.A g (h_source i))
     · have h_j_neq_source : j ≠ source := by omega
       simp [EF1ij]
-      have h_i_bundle_unchanged : (add_item_to_agent c st source g).A i = st.A i := by
+      have h_i_bundle_unchanged : (add_item_to_agent st source g).A i = st.A i := by
         simp [add_item_to_agent, h_i_neq_source]
-      have h_j_bundle_unchanged : (add_item_to_agent c st source g).A j = st.A j := by
+      have h_j_bundle_unchanged : (add_item_to_agent st source g).A j = st.A j := by
         simp [add_item_to_agent, h_j_neq_source]
       -- rw [h_i_bundle_unchanged, h_j_bundle_unchanged] at h_envy_
       simp [Envies]

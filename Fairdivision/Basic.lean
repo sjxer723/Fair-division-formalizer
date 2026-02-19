@@ -9,7 +9,7 @@ import Mathlib.Data.List.Chain
 import Mathlib.Data.List.Rotate
 import Mathlib.Tactic.Cases
 import Mathlib.Combinatorics.Additive.Convolution
-import Efx.FinUtils
+import Fairdivision.FinUtils
 import Mathlib.Algebra.Order.Group.Int.Sum
 
 namespace fairdivision
@@ -52,9 +52,11 @@ def EF1
     EF1ij u A i j
 
 
-lemma ef1ij_maintained_after_adding_item_to_i (c : FDContext Agent Item)
-  (i j : Agent) (A : Allocation Agent Item) (g : Item) (h_ef1ij : EF1ij c.u A i j) :
-  EF1ij c.u (fun a => if a = i then insert g (A a) else A a) i j := by
+lemma ef1ij_insert_i_of_ef1ij {c : FDContext Agent Item} {i j : Agent}
+  {A : Allocation Agent Item} {g : Item}
+  (h_ef1ij : EF1ij c.u A i j) :
+  EF1ij c.u (fun a => if a = i then insert g (A a) else A a) i j :=
+by
   unfold EF1ij at *
   unfold Envies
   intro h_envies
@@ -160,7 +162,6 @@ lemma EnvyCycle.next_prev
         simp [findIdx_get _ C.nodup next_idx]
     unfold next_idx at h_find
     simp_all
-    exact fin_add_one_sub_one idx C.length_gt_one
   · -- i ∉ C.agents
     unfold next prev
     simp [hmem]
@@ -187,7 +188,6 @@ lemma EnvyCycle.prev_next
         simp [findIdx_get _ C.nodup prev_idx]
     unfold prev_idx at h_find
     simp_all
-    exact fin_sub_one_add_one idx C.length_gt_one
   · -- i ∉ C.agents
     unfold next prev
     simp [hmem]
@@ -212,9 +212,6 @@ lemma EnvyCycle.next_of_last
            (⟨idx_of_last, idx_of_last_lt_len⟩ + ⟨1, h_C_pos_len⟩)
          = C.agents.get ⟨0, by omega⟩ := by
     simp [idx_of_last_eq_len_minus_one]
-    congr
-    have := fin_n_minus_one_add_one h_C_pos_len
-    simp [this]
   simp
   exact h_next_of_last
 
@@ -231,23 +228,19 @@ lemma EnvyCycle.next_of_other
     apply findIdx_get _ C.nodup idx
   have h_i_lt_len : i < C.agents.length := by
     omega
-  have h_next_of_other : C.agents.get
-           (⟨i, by omega⟩ + ⟨1, C.length_gt_one⟩)
-         = C.agents.get ⟨i + 1, by omega⟩ := by
-    congr
-    have := fin_i_lt_n_add_one C.length_gt_one hmem
-    simp [this]
   simp [h_find_idx]
   simp [h_i_lt_len]
-  exact h_next_of_other
+  congr
+  simp_all
 
 def social_welfare (c : FDContext Agent Item) (st : FDState Agent Item) : ℕ :=
   ∑ i, c.u i (st.A i)
 
+@[simp]
 lemma upper_bound_of_social_welfare
   (c : FDContext Agent Item)
   (st : FDState Agent Item)
-  (h_fea : Feasible c st) :
+  (h_feasible : Feasible c st) :
   social_welfare c st ≤ ∑ i, c.u i c.M := by
   unfold social_welfare
   -- have h_sum_le : ∑ i, u i (A i) ≤ ∑ i, u i M := by
@@ -263,7 +256,7 @@ lemma upper_bound_of_social_welfare
     intro x hx
     have : x ∈ Finset.univ.biUnion st.A ∪ st.U :=
       Finset.mem_union.mpr (Or.inl hx)
-    simpa [h_fea.cover] using this
+    simpa [h_feasible.cover] using this
   have h_alloc_subset : st.A i ⊆ (Finset.univ.biUnion st.A) := by
     apply Finset.subset_biUnion_of_mem
     exact Finset.mem_univ i
@@ -272,6 +265,7 @@ lemma upper_bound_of_social_welfare
 def potential (c : FDContext Agent Item) (st : FDState Agent Item) : ℕ :=
    ∑ i, c.u i c.M  - ∑ i, c.u i (st.A i) + st.U.card
 
+@[simp]
 lemma potential_nonnegative
   (c : FDContext Agent Item)
   (st : FDState Agent Item)
@@ -282,6 +276,7 @@ lemma potential_nonnegative
     apply upper_bound_of_social_welfare c st h_fea
   linarith
 
+@[simp]
 lemma potential_lt_equiv_social_welfare_gt
   (c : FDContext Agent Item)
   (st1 st2 : FDState Agent Item)
@@ -298,6 +293,7 @@ lemma potential_lt_equiv_social_welfare_gt
     rw [h_unallocated_unchanged]
   omega
 
+@[simp]
 lemma potential_lt_implied_by_unallocated_size_lt
   (c : FDContext Agent Item)
   (st1 st2 : FDState Agent Item)
@@ -320,8 +316,5 @@ lemma bundle_subset_allocated_items (st : FDState Agent Item) :
   intro i
   apply Finset.subset_biUnion_of_mem
   exact Finset.mem_univ i
-
-
-
 
 end fairdivision
