@@ -1,4 +1,5 @@
 import Efx.Basic
+import Efx.FinUtils
 
 open fairdivision
 
@@ -286,7 +287,7 @@ lemma feasibility_preserved_under_add_item_to_agent
     have h_allocation_change : Finset.univ.biUnion (add_item_to_agent c st source g).A =
       Finset.univ.biUnion st.A ∪ {g} := by
       simp [add_item_to_agent]
-      rw [biUnion_update_add_g st.A source g]
+      rw [univ_biUnion_inner_insert st.A source g]
       simp
     simp [add_item_to_agent] at h_allocation_change
     rw [h_allocation_change, ← h_cover]

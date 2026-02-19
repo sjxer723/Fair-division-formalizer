@@ -321,78 +321,7 @@ lemma bundle_subset_allocated_items (st : FDState Agent Item) :
   apply Finset.subset_biUnion_of_mem
   exact Finset.mem_univ i
 
-lemma biUnion_update_add_g
-    {ι α} [Fintype ι] [DecidableEq ι] [DecidableEq α]
-    (A : ι → Finset α) (source : ι) (g : α) :
-    Finset.univ.biUnion (fun i => if i = source then insert g (A i) else A i)
-      = Finset.univ.biUnion A ∪ {g} :=
-by
-  ext x
-  constructor
-  · intro hx
-    rcases Finset.mem_biUnion.mp hx with ⟨i, _, hxAi⟩
-    by_cases h : i = source
-    · subst h
-      simp at hxAi
-      -- simp [add_item_to_agent] at hxAi
-      -- in insert g (st.A source)
-      rcases hxAi with hx_eq | hxA
-      · rw [hx_eq]
-        simp
-      · have : A i ⊆ Finset.univ.biUnion A := by
-          intro x
-          apply Finset.subset_biUnion_of_mem
-          exact Finset.mem_univ i
-        have : x ∈ Finset.univ.biUnion A := by
-          apply Finset.mem_biUnion.mpr
-          use i
-        apply Finset.mem_union.mpr
-        left
-        exact this
-    · -- i ≠ source
-      -- simp at hxAi
-      simp [h] at hxAi
-      simp
-      right
-      use i
 
-  · intro hx
-    rcases Finset.mem_union.mp hx with hxA | hxg
-    · -- old biUnion
-      rcases Finset.mem_biUnion.mp hxA with ⟨i, _, hxA⟩
-      by_cases h : i = source
-      · subst h
-        simp
-        use i
-        simp
-        right
-        exact hxA
-      · simp
-        use i
-        simp [h]
-        exact hxA
-    · simp
-      use source
-      simp
-      left
-      simp at hxg
-      omega
-
-
-lemma insert_union_erase_of_mem {α} [DecidableEq α]
-  {g : α} {t s : Finset α} (h : g ∈ s) :
-  insert g t ∪ s.erase g = t ∪ s :=
-by
-  have h₁ := Finset.insert_erase h
-
-  calc
-    insert g t ∪ s.erase g
-        = insert g (t ∪ s.erase g) := by
-            simp [Finset.insert_union]
-    _   = t ∪ insert g (s.erase g) := by
-            simp [Finset.union_insert]
-    _   = t ∪ s := by
-            simp [h₁]
 
 
 end fairdivision
