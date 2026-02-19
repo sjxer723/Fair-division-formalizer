@@ -1,14 +1,3 @@
-import Mathlib.Data.Fintype.Basic
-import Mathlib.Data.Fintype.Card
-import Mathlib.Data.Finset.Basic
-import Mathlib.Data.Fin.Basic
-import Mathlib.Logic.Function.Iterate
-import Mathlib.Algebra.BigOperators.Group.Finset.Basic
-import Mathlib.Tactic.Linarith
-import Mathlib.Data.List.Chain
-import Mathlib.Data.List.Rotate
-import Mathlib.Tactic.Cases
-import Mathlib.Combinatorics.Additive.Convolution
 import Efx.Basic
 
 open fairdivision
@@ -357,3 +346,42 @@ lemma potential_decreases_after_add_item_to_agent
     potential_lt_implied_by_unallocated_size_lt c st1 st h_feasible1 h_feasible
       h_social_welfare_nondecreasing h_unalocated_decreases
   )
+
+lemma ef1_preserved_under_add_item_to_agent
+  (c : FDContext Agent Item)
+  (st : FDState Agent Item)
+  (source : Agent)
+  (h_source : ∀ j, ¬ Envies c.u st.A j source)
+  (g : Item) :
+  let st1 := add_item_to_agent c st source g;
+  EF1 c.u st.A → EF1 c.u st1.A := by
+  intro st1 h_ef1
+  unfold st1 EF1
+  intro i j
+  have h_envy_st1 : EF1ij c.u st.A i j := h_ef1 i j
+  -- simp [EF1ij] at h_envy_st1
+  by_cases h_source_i : i = source
+  · simp [h_source_i] at *
+    by_cases h_source_j : j = source
+    · simp [h_source_j]
+      simp [EF1ij]
+      intro h_envy
+      simp [Envies] at h_envy
+    · simp [add_item_to_agent]
+      have h_j_not_envy_source : ¬ Envies c.u st.A j source := h_source j
+      exact (ef1ij_maintained_after_adding_item_to_i c source j st.A g h_envy_st1)
+  · have h_i_neq_source : i ≠ source := by omega
+    by_cases h_source_j : j = source
+    · simp [h_source_j] at *
+      simp [add_item_to_agent]
+      exact (ef1ij_maintained_after_adding_item_to_j c i source st.A g (h_source i))
+    · have h_j_neq_source : j ≠ source := by omega
+      simp [EF1ij]
+      have h_i_bundle_unchanged : (add_item_to_agent c st source g).A i = st.A i := by
+        simp [add_item_to_agent, h_i_neq_source]
+      have h_j_bundle_unchanged : (add_item_to_agent c st source g).A j = st.A j := by
+        simp [add_item_to_agent, h_j_neq_source]
+      -- rw [h_i_bundle_unchanged, h_j_bundle_unchanged] at h_envy_
+      simp [Envies]
+      rw [h_i_bundle_unchanged, h_j_bundle_unchanged] at *
+      exact h_envy_st1

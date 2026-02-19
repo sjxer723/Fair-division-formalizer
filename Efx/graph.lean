@@ -1,16 +1,4 @@
-import Mathlib.Data.Fintype.Basic
-import Mathlib.Data.Fintype.Card
-import Mathlib.Data.Finset.Basic
-import Mathlib.Data.Fin.Basic
-import Mathlib.Logic.Function.Iterate
-import Mathlib.Algebra.BigOperators.Group.Finset.Basic
-import Mathlib.Tactic.Linarith
-import Mathlib.Data.List.Chain
-import Mathlib.Data.List.Rotate
-import Mathlib.Tactic.Cases
-import Mathlib.Combinatorics.Additive.Convolution
 import Efx.Basic
-import Efx.source
 
 open fairdivision
 
@@ -24,14 +12,6 @@ def rotate_allocation
   : FDState Agent Item :=
   { A := fun i => st.A (C.next c st i),
     U := st.U }
-
-def add_item_to_agent (c : FDContext Agent Item)
-  (st : FDState Agent Item)
-  (source : Agent)
-  (g : Item) : FDState Agent Item :=
-  { A := fun i => if i = source then st.A i ∪ {g} else st.A i,
-    U := st.U \ {g} }
-
 
 -- Invariant 1: Feasibility is preserved under rotation
 lemma union_of_allocated_items_unchanged

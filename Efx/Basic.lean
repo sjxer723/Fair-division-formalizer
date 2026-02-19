@@ -51,6 +51,59 @@ def EF1
   ∀ i j : Agent,
     EF1ij u A i j
 
+
+lemma ef1ij_maintained_after_adding_item_to_i (c : FDContext Agent Item)
+  (i j : Agent) (A : Allocation Agent Item) (g : Item) (h_ef1ij : EF1ij c.u A i j) :
+  EF1ij c.u (fun a => if a = i then insert g (A a) else A a) i j := by
+  unfold EF1ij at *
+  unfold Envies
+  intro h_envies
+  by_cases h_ij_eq: i = j
+  · simp [h_ij_eq] at *
+  · simp at *
+    have hji : j ≠ i := by
+      simpa [ne_comm] using h_ij_eq
+    simp [hji] at h_envies
+    simp [hji]
+    have h_envies_before: Envies c.u A i j := by
+      have : c.u i (A i) ≤ c.u i (insert g (A i)) := by
+        apply c.mono_u
+        simp
+      simp [Envies]
+      linarith
+    have h_ef1_before: ∃ g' ∈ A j, c.u i (A i) ≥ c.u i (A j \ {g'}) := (h_ef1ij h_envies_before)
+    rcases h_ef1_before with ⟨g', ⟨hg_mem', hg_ef1⟩⟩
+    use g'
+    constructor
+    · exact hg_mem'
+    · have : c.u i (A i) ≤ c.u i (insert g (A i)) := by
+        apply c.mono_u
+        simp
+      linarith
+
+
+lemma ef1ij_maintained_after_adding_item_to_j (c : FDContext Agent Item)
+  (i j : Agent) (A : Allocation Agent Item) (g : Item) (h_ef1ij : ¬ Envies c.u A i j) :
+  EF1ij c.u (fun a => if a = j then insert g (A a) else A a) i j := by
+  unfold EF1ij at *
+  intro h_envies
+  use g
+  simp
+  by_cases h_ij_eq: i = j
+  · simp [h_ij_eq] at *
+    apply c.mono_u
+    simp
+  · have : i ≠ j := by omega
+    simp [this]
+    have h_nonenvies_before : c.u i (A i) ≥ c.u i (A j) := by
+      simp [Envies] at h_ef1ij
+      linarith
+    have h_insert_erase : c.u i (insert g (A j) \ {g}) ≤ c.u i (A j) := by
+      apply c.mono_u
+      rw [Finset.sdiff_singleton_eq_erase]
+      apply Finset.erase_insert_subset
+    linarith
+
 structure EnvyCycle (c : FDContext Agent Item) (st : FDState Agent Item) where
   agents : List Agent
   nodup  : agents.Nodup
